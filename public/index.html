@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 購車顧問｜TOYOTA bZ4X</title>
+  <!-- Rajdhani：只套用在英文字母/數字（品牌徽章、按鈕裡的英數字），
+       中文字還是用系統內建字型，Rajdhani 本身不含中文字符 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="chat-container">
+    <header class="chat-header">
+      <h1>AI 購車顧問 <span class="model-badge">TOYOTA bZ4X</span></h1>
+      <p class="subtitle">直接開始聊天，或用下面的格子做適配度調查、比較車輛</p>
+    </header>
+
+    <!-- ============================================================
+         聊天室主體：chat-messages 跟 6 個功能面板疊在同一個區塊裡
+         （.chat-body 用 position:relative，裡面每個子區塊 position:absolute
+         inset:0，同一時間只會顯示一個）。面板打開時會整個蓋住聊天室，
+         不是像以前那樣擠在聊天室下面的一小塊。
+    ============================================================= -->
+    <div class="chat-body">
+      <div id="chat-messages" class="chat-messages"></div>
+
+      <!-- ============================================================
+           適配度問卷面板：預設隱藏，點下面「適配度調查」格子才會打開。
+
+           題目共 6 題，這裡直接一次全部畫出來、直向排成一欄，
+           每一題的寬度就是面板（=聊天室）的寬度，不用左右箭頭分頁，
+           題目多的話直接往下捲動看更多（見 script.js 的 renderSurveyQuestions）。
+
+           題目內容不寫死在這裡，而是靠 script.js 呼叫 GET /api/survey-questions
+           動態產生，這樣以後改題目只要改 scoring.js 一個地方就好。
+      ============================================================= -->
+      <div id="survey-panel" class="survey-panel" hidden>
+        <div class="survey-panel-header">
+          <span>適配度問卷</span>
+          <button type="button" id="survey-close" aria-label="關閉適配度問卷">✕</button>
+        </div>
+        <form id="survey-form" class="survey-form">
+          <p class="survey-intro">以下每一題請依照「你同意這句話的程度」，選擇 1（非常不同意）～5（非常同意）。</p>
+          <div id="survey-questions" class="survey-questions-list"><!-- 題目由 JS 動態插入這裡，一次全部畫出來 --></div>
+          <button type="submit">開始評估</button>
+        </form>
+      </div>
+
+      <!-- ============================================================
+           車輛比較面板：預設隱藏，點下面「車輛比較」格子才會打開。
+           六個比較項目一次顯示 3 個，靠左右箭頭切換到後面 3 個。
+           題目內容不寫死在這裡，靠 script.js 呼叫 GET /api/compare-points 動態產生。
+      ============================================================= -->
+      <div id="compare-panel" class="compare-panel" hidden>
+        <div class="compare-panel-header">
+          <span>車輛比較（燃油車 vs 這台電動車）</span>
+          <button type="button" id="compare-close" aria-label="關閉車輛比較">✕</button>
+        </div>
+        <div class="compare-carousel">
+          <button type="button" id="compare-prev" class="compare-arrow" aria-label="上一組">‹</button>
+          <div id="compare-cards" class="compare-cards"><!-- 比較卡片由 JS 動態插入 --></div>
+          <button type="button" id="compare-next" class="compare-arrow" aria-label="下一組">›</button>
+        </div>
+        <div id="compare-page-indicator" class="compare-page-indicator"></div>
+      </div>
+
+      <!-- ============================================================
+           情境模擬面板：預設隱藏，點下面「情境模擬」格子才會打開。
+           兩種互動方式：
+           1. 點情境卡片（山區／長途／寒冷氣候／公寓充電）：把該情境的背景事實丟給 AI 生成說明。
+           2. 下面的輸入框直接打字問特殊情境：後端先用關鍵字比對有沒有碰到寫好的情境資料，
+              比對不到就讓 AI 老實說不確定、建議轉真人客服（見 server.js 的 SCENARIO_SYSTEM_PROMPT）。
+           結果都是用聊天室訊息呈現，不像問卷/成本試算是一次性表單，
+           所以這個面板不會自動關閉，讓客戶可以連續點好幾個情境或連續問。
+      ============================================================= -->
+      <div id="scenario-panel" class="scenario-panel" hidden>
+        <div class="scenario-panel-header">
+          <span>情境模擬</span>
+          <button type="button" id="scenario-close" aria-label="關閉情境模擬">✕</button>
+        </div>
+        <p class="scenario-intro">點下面的情境卡片，或直接在輸入框打字描述你的用車情境。</p>
+        <div class="compare-carousel">
+          <button type="button" id="scenario-prev" class="compare-arrow" aria-label="上一組">‹</button>
+          <div id="scenario-cards" class="compare-cards"><!-- 情境卡片由 JS 動態插入 --></div>
+          <button type="button" id="scenario-next" class="compare-arrow" aria-label="下一組">›</button>
+        </div>
+        <div id="scenario-page-indicator" class="compare-page-indicator"></div>
+        <form id="scenario-form" class="scenario-form">
+          <input
+            id="scenario-question"
+            type="text"
+            placeholder="例如：冬天在山上開會不會很快沒電？"
+            autocomplete="off"
+          />
+          <button type="button" id="scenario-voice-btn" class="voice-btn" aria-label="語音輸入" title="語音輸入">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
+          </button>
+          <button type="submit">詢問 AI</button>
+        </form>
+      </div>
+
+      <!-- ============================================================
+           成本試算面板：預設隱藏，點下面「成本試算」格子才會打開。
+           輸入客戶目前的用車習慣，後端 costCalc.js 純函式算出油車 vs 電動車的
+           每月／每年花費（完全不靠 AI，數字才可驗證），算完才丟給 AI 寫成說明文字。
+      ============================================================= -->
+      <div id="cost-panel" class="cost-panel" hidden>
+        <div class="cost-panel-header">
+          <span>油電成本試算</span>
+          <button type="button" id="cost-close" aria-label="關閉成本試算">✕</button>
+        </div>
+        <form id="cost-form" class="cost-form">
+          <label>
+            每月行駛里程（公里）
+            <input id="cost-monthly-km" type="number" min="1" step="1" placeholder="例如 800" required />
+          </label>
+          <label>
+            目前油車油耗（公里/公升）
+            <input id="cost-gas-efficiency" type="number" min="0.1" step="0.1" placeholder="例如 14" required />
+          </label>
+          <label>
+            目前油價（元/公升）
+            <input id="cost-gas-price" type="number" min="1" step="0.1" placeholder="例如 30" required />
+          </label>
+          <label>
+            主要充電方式
+            <select id="cost-charging-type">
+              <option value="home">家用慢充</option>
+              <option value="public">公共快充</option>
+            </select>
+          </label>
+          <button type="submit">開始試算</button>
+        </form>
+      </div>
+
+      <!-- ============================================================
+           充電站查詢面板：預設隱藏，點下面「充電站查詢」格子才會打開。
+           跟情境模擬同一套互動方式（卡片 + 自由輸入），差別是題庫換成
+           chargingStation.js（家用充電／公共充電站／國道服務區快充／第三方超充站），
+           回答內容一定會提醒客戶這不是即時地圖站況，請用充電 App 確認。
+      ============================================================= -->
+      <div id="charging-panel" class="scenario-panel" hidden>
+        <div class="scenario-panel-header">
+          <span>充電站查詢</span>
+          <button type="button" id="charging-close" aria-label="關閉充電站查詢">✕</button>
+        </div>
+        <p class="scenario-intro">點下面的充電方式卡片，或直接在輸入框打字問你關心的充電問題（不是即時地圖，僅提供概略資訊）。</p>
+        <div class="compare-carousel">
+          <button type="button" id="charging-prev" class="compare-arrow" aria-label="上一組">‹</button>
+          <div id="charging-cards" class="compare-cards"><!-- 充電主題卡片由 JS 動態插入 --></div>
+          <button type="button" id="charging-next" class="compare-arrow" aria-label="下一組">›</button>
+        </div>
+        <div id="charging-page-indicator" class="compare-page-indicator"></div>
+        <form id="charging-form" class="scenario-form">
+          <input
+            id="charging-question"
+            type="text"
+            placeholder="例如：住的地方附近沒有充電站怎麼辦？"
+            autocomplete="off"
+          />
+          <button type="button" id="charging-voice-btn" class="voice-btn" aria-label="語音輸入" title="語音輸入">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
+          </button>
+          <button type="submit">詢問 AI</button>
+        </form>
+      </div>
+
+      <!-- ============================================================
+           真人客服聯繫面板：預設隱藏，點下面「真人客服聯繫」格子才會打開。
+           純粹是留言表單，內容原封不動存進資料庫的 contact_requests 表，
+           不經過 AI 改寫（見 server.js 的 /api/contact-request），
+           送出成功後面板自動關閉，聊天室顯示已收到留言的確認訊息。
+      ============================================================= -->
+      <div id="contact-panel" class="cost-panel" hidden>
+        <div class="cost-panel-header">
+          <span>真人客服聯繫</span>
+          <button type="button" id="contact-close" aria-label="關閉真人客服聯繫">✕</button>
+        </div>
+        <p class="scenario-intro">留下你的聯絡方式，客服會盡快回覆（服務時間：週一至週五 9:00～18:00）。</p>
+        <form id="contact-form" class="cost-form">
+          <label>
+            姓名
+            <input id="contact-name" type="text" placeholder="例如 王小明" required />
+          </label>
+          <label>
+            聯絡方式（電話或 Email）
+            <input id="contact-info" type="text" placeholder="例如 0912-345-678" required />
+          </label>
+          <label>
+            想諮詢的內容（選填）
+            <textarea id="contact-message" rows="3" placeholder="例如：想了解貸款方案"></textarea>
+          </label>
+          <button type="submit">送出留言</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         快捷格子：聊天室下面固定顯示的功能入口，固定 6 格、不用箭頭切換，
+         一次全部看得到（.quick-actions 用 CSS grid 排版）。
+    ============================================================= -->
+    <div class="quick-actions">
+      <button type="button" id="tile-survey" class="quick-action-tile">
+        <span class="tile-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 12l2 2 4-4"/></svg>
+        </span>
+        <span>適配度調查</span>
+      </button>
+      <button type="button" id="tile-compare" class="quick-action-tile">
+        <span class="tile-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-5l2-5h12l2 5v5"/><path d="M4 16h16"/><circle cx="8" cy="17.5" r="1.5"/><circle cx="16" cy="17.5" r="1.5"/></svg>
+        </span>
+        <span>車輛比較</span>
+      </button>
+      <button type="button" id="tile-scenario" class="quick-action-tile">
+        <span class="tile-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg>
+        </span>
+        <span>情境模擬</span>
+      </button>
+      <button type="button" id="tile-cost" class="quick-action-tile">
+        <span class="tile-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8.5" y1="12" x2="8.5" y2="12"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="15.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="15.5" x2="8.5" y2="15.5"/><line x1="12" y1="15.5" x2="12" y2="15.5"/><line x1="15.5" y1="15.5" x2="15.5" y2="15.5"/></svg>
+        </span>
+        <span>成本試算</span>
+      </button>
+      <button type="button" id="tile-charging" class="quick-action-tile">
+        <span class="tile-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+        </span>
+        <span>充電站查詢</span>
+      </button>
+      <button type="button" id="tile-contact" class="quick-action-tile">
+        <span class="tile-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13a8 8 0 0 1 16 0"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19v1a3 3 0 0 1-3 3h-2"/></svg>
+        </span>
+        <span>真人客服聯繫</span>
+      </button>
+    </div>
+
+    <form id="chat-form" class="chat-input-area">
+      <input
+        id="chat-input"
+        type="text"
+        placeholder="輸入訊息後按 Enter 送出..."
+        autocomplete="off"
+      />
+      <button type="button" id="chat-voice-btn" class="voice-btn" aria-label="語音輸入" title="語音輸入">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
+      </button>
+      <button type="submit">送出</button>
+    </form>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

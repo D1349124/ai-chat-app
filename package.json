@@ -1,0 +1,14 @@
+{
+  "name": "ai-chat-app",
+  "version": "1.0.0",
+  "description": "AI 購車顧問：先做客戶適配度調查並存進資料庫，再串接 Google Gemini 進行對話",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2"
+  }
+}

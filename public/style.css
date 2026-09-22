@@ -1,0 +1,714 @@
+/* style.css
+   -------------------------------------------------------------
+   視覺風格：深色未來科技風（obsidian 黑底 + 電光藍 + 白字），
+   對應設計需求「Modern high-tech automotive landing page UI for
+   Toyota bZ4X, dark mode, deep obsidian black background, electric
+   blue and crisp white typography, geometric cards, minimal line
+   icons, digital-dashboard feel, high contrast, premium EV vibe」。
+
+   - 底色：obsidian 黑（不是普通深灰，是偏藍黑的漸層），營造「儀表板」的沉浸感
+   - 主色：電光藍，所有互動元件（按鈕、焦點、圖示、電動車標籤）統一用這個顏色，
+     跟前一版「Toyota 品牌紅」方向不同——這版不強調品牌識別，強調科技/未來感
+   - 卡片：深色表面 + 細微邊框 + 滑鼠移過去會「浮起來」並發出藍光，
+     呼應 brief 裡的 "futuristic floating elements"
+   - 圖示：6 個主格子換成手繪的極簡線條 SVG（不用 emoji），
+     跟「minimal line icons」的要求一致；面板內部的情境/充電卡片圖示
+     還是 emoji（那些是資訊內容用的標示，不是主視覺，先不動，
+     之後要一起换成線條圖示可以再說）
+------------------------------------------------------------- */
+
+:root {
+  --bg: #05070a;
+  --bg-glow-top: #0c1420;
+  --surface: #0b0f15;
+  --surface-2: #121922;
+  --surface-3: #1a232e;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --blue: #1e9bff;
+  --blue-bright: #5cc8ff;
+  --blue-dim: #0b72d9;
+  --blue-glow: rgba(30, 155, 255, 0.35);
+  --text: #f3f6f9;
+  --text-dim: #93a1b0;
+  --text-faint: #5b6774;
+  --font-display: "Rajdhani", "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 細滑鼠捲軸，藍色調，跟整體暗色介面搭 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--blue-dim);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+  color: var(--text);
+  /* obsidian 黑，頂部帶一點藍黑漸層光暈，避免整片死黑看起來像沒載入成功 */
+  background: radial-gradient(ellipse 1200px 700px at 50% -10%, var(--bg-glow-top) 0%, var(--bg) 55%);
+}
+
+.chat-container {
+  width: 100%;
+  max-width: 840px;
+  height: 92vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  /* 藍色外光暈 + 深色陰影，"floating" 的懸浮感 */
+  box-shadow: 0 0 60px rgba(30, 155, 255, 0.12), 0 20px 50px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-header {
+  padding: 20px;
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+/* 頭部底下一條電光藍的漸層光線，取代原本的實色分隔線，呼應「儀表板」感 */
+.chat-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--blue) 50%, transparent 100%);
+  box-shadow: 0 0 12px 1px var(--blue-glow);
+}
+
+.chat-header h1 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.chat-header .model-badge {
+  font-family: var(--font-display);
+  padding: 2px 10px;
+  border: 1px solid var(--blue);
+  border-radius: 4px;
+  background: rgba(30, 155, 255, 0.1);
+  color: var(--blue-bright);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 10px var(--blue-glow);
+}
+
+.chat-header .subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ---- 聊天室主體：chat-messages 跟 6 個功能面板疊在同一塊區域 ----
+   .chat-body 是這疊層的「舞台」，佔滿 header 跟下面格子/輸入框之間的所有空間；
+   裡面每個子區塊都是 position: absolute; inset: 0，同一時間只有一個在顯示
+   （沒開面板時是 chat-messages，開了面板就換那個面板蓋住整個區域）。 */
+.chat-body {
+  position: relative;
+  flex: 1;
+  min-height: 0; /* flex 子項要能正確算出可用高度、讓內層 overflow 生效，不能省略 */
+}
+
+/* ---- 面板共用外觀：深色表面、細邊框、標題列 + ✕ 關閉鈕 ----
+   適配度問卷／車輛比較／情境模擬／成本試算／充電站查詢／真人客服都套這套。
+   position: absolute; inset: 0 讓面板整個蓋住 .chat-body（=蓋住整個聊天室），
+   不再是以前那種擠在聊天室下面、最多 60vh 高的小區塊。 */
+.survey-panel,
+.compare-panel,
+.scenario-panel,
+.cost-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow-y: auto;
+  padding: 18px;
+  background: var(--surface);
+}
+
+.survey-panel-header,
+.compare-panel-header,
+.scenario-panel-header,
+.cost-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  letter-spacing: 0.01em;
+}
+
+.survey-panel-header button,
+.compare-panel-header button,
+.scenario-panel-header button,
+.cost-panel-header button {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.survey-panel-header button:hover,
+.compare-panel-header button:hover,
+.scenario-panel-header button:hover,
+.cost-panel-header button:hover {
+  color: var(--blue-bright);
+  border-color: var(--blue);
+}
+
+.survey-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.survey-intro,
+.scenario-intro {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* 題目清單：直向排一欄，每一題寬度就是面板（=聊天室）的寬度，
+   不用左右箭頭分頁——6 題一次全部畫出來，題目多的話面板本身
+   overflow-y: auto，直接往下捲動看更多（見上面 .survey-panel 的設定）。 */
+.survey-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 每一題的外框：深色卡片，像儀表板上一格獨立面板 */
+.likert-question {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0;
+  background: var(--surface-2);
+}
+
+.likert-question legend {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0 4px;
+}
+
+.likert-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 每個 1~5 分的選項：數字 + 圓形單選框，垂直排列 */
+.likert-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.likert-option input {
+  cursor: pointer;
+  accent-color: var(--blue);
+}
+
+.likert-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* ---- 主要送出按鈕：電光藍漸層 + 發光陰影，"premium EV" 的關鍵元件 ---- */
+.survey-form button[type="submit"],
+.cost-form button[type="submit"] {
+  margin-top: 8px;
+  padding: 13px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dim) 100%);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 0 18px var(--blue-glow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.survey-form button[type="submit"]:hover,
+.cost-form button[type="submit"]:hover {
+  box-shadow: 0 0 26px var(--blue-glow);
+  transform: translateY(-1px);
+}
+
+.survey-form button[type="submit"]:disabled,
+.cost-form button[type="submit"]:disabled {
+  background: var(--surface-3);
+  color: var(--text-faint);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 訊息清單區：可以往下捲動 */
+.chat-messages {
+  position: absolute;
+  inset: 0;
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message {
+  max-width: 75%;
+  padding: 11px 15px;
+  border-radius: 14px;
+  line-height: 1.5;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 使用者訊息：靠右、電光藍漸層，帶一點發光 */
+.message.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dim) 100%);
+  color: white;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 0 14px var(--blue-glow);
+}
+
+/* AI 訊息：靠左、深色卡片，跟使用者訊息的藍色拉開對比 */
+.message.ai {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+/* 「AI 正在輸入」的提示樣式 */
+.message.loading {
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+/* 快捷格子：固定 6 格，用 CSS grid 排成 3 欄 x 2 列，一次全部看得到，
+   不用箭頭或滑動切換。之後格子數量變動，grid 會自動排列（不是固定死 6 個）。 */
+.quick-actions {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* 一定要有這條規則：上面 .quick-actions 自己設了 display: grid，
+   會蓋掉瀏覽器內建的 [hidden] { display: none }（兩條都是 class/屬性選擇器、
+   優先權打平時，後面寫的這條規則才會生效）。沒有這條的話，
+   JS 設定 quickActions.hidden = true 只會改到 DOM 屬性，畫面上格子不會真的消失。 */
+.quick-actions[hidden] {
+  display: none;
+}
+
+/* 「geometric card」+「floating」：方正卡片、細邊框，滑鼠移過去浮起來並發出藍光 */
+.quick-action-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.quick-action-tile:hover {
+  background: var(--surface-3);
+  border-color: var(--blue);
+  box-shadow: 0 6px 20px rgba(30, 155, 255, 0.18);
+  transform: translateY(-2px);
+}
+
+.quick-action-tile .tile-icon {
+  color: var(--blue-bright);
+  display: flex;
+}
+
+.quick-action-tile .tile-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* 車輛比較 / 情境模擬 / 充電站查詢共用的輪播箭頭：深色圓鈕、電光藍圖示 */
+.compare-carousel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-arrow {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--blue-bright);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.compare-arrow:hover:not(:disabled) {
+  border-color: var(--blue);
+  box-shadow: 0 0 10px var(--blue-glow);
+}
+
+.compare-arrow:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+/* 夠寬的畫面會自動排成兩、三欄，窄畫面自動變回單欄，跟問卷輪播用同一套邏輯 */
+.compare-cards {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.compare-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+
+.compare-card h3 {
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* 情境模擬／充電站查詢卡片標題前的線條圖示，跟主要 6 格快捷格子同一套視覺風格 */
+.card-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--blue-bright);
+}
+
+.card-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.compare-row {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.compare-tag {
+  display: inline-block;
+  min-width: 52px;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: center;
+  color: white;
+}
+
+.compare-tag.gasoline {
+  background: var(--surface-3);
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
+}
+
+/* 電動車標籤用電光藍發光小標，一眼認出「這是電動車的數據」 */
+.compare-tag.ev {
+  background: var(--blue);
+  box-shadow: 0 0 8px var(--blue-glow);
+}
+
+.compare-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.compare-page-indicator {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.compare-card.clickable {
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.compare-card.clickable:hover {
+  border-color: var(--blue);
+  box-shadow: 0 6px 18px rgba(30, 155, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.compare-card.clickable:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.scenario-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.scenario-form input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.scenario-form input::placeholder {
+  color: var(--text-faint);
+}
+
+.scenario-form input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(30, 155, 255, 0.15);
+}
+
+.scenario-form button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dim) 100%);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 14px var(--blue-glow);
+}
+
+.scenario-form button:hover {
+  box-shadow: 0 0 20px var(--blue-glow);
+}
+
+.scenario-form button:disabled {
+  background: var(--surface-3);
+  color: var(--text-faint);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.cost-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cost-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.cost-form input,
+.cost-form select,
+.cost-form textarea {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.cost-form input::placeholder,
+.cost-form textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.cost-form input:focus,
+.cost-form select:focus,
+.cost-form textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(30, 155, 255, 0.15);
+  outline: none;
+}
+
+.chat-input-area {
+  display: flex;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.chat-input-area input {
+  flex: 1;
+  padding: 11px 16px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.chat-input-area input::placeholder {
+  color: var(--text-faint);
+}
+
+.chat-input-area input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(30, 155, 255, 0.15);
+}
+
+.chat-input-area button {
+  padding: 11px 20px;
+  border: none;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dim) 100%);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 14px var(--blue-glow);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.chat-input-area button:hover {
+  box-shadow: 0 0 20px var(--blue-glow);
+  transform: translateY(-1px);
+}
+
+/* ---- 語音輸入按鈕：圓形麥克風圖示，跟旁邊的「送出」/「詢問 AI」藥丸型按鈕
+   分開處理（選擇器多寫一層 class 拉高優先權，蓋掉上面 .chat-input-area button /
+   .scenario-form button 那兩條藥丸型按鈕的樣式）。錄音中會變紅色並持續脈動，
+   讓使用者一眼看出「現在正在收音」。點兩下（開始/停止）由 script.js 控制。 */
+.chat-input-area .voice-btn,
+.scenario-form .voice-btn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--blue-bright);
+  cursor: pointer;
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.chat-input-area .voice-btn:hover,
+.scenario-form .voice-btn:hover {
+  border-color: var(--blue);
+  box-shadow: 0 0 10px var(--blue-glow);
+  transform: none;
+}
+
+.voice-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.voice-btn.recording {
+  background: #e0243e;
+  border-color: #e0243e;
+  color: white;
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 36, 62, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(224, 36, 62, 0);
+  }
+}
+
+.voice-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  animation: none;
+}
